@@ -1,7 +1,7 @@
 {
   "name": "code-health",
-  "displayName": "Code Health Pro",
-  "description": "Professional Code Health Monitoring Tool",
+  "displayName": "Code Health Analyzer",
+  "description": "AI-powered code quality analyzer",
   "version": "0.0.1",
   "publisher": "your-name",
   "engines": {
@@ -17,8 +17,8 @@
       "activitybar": [
         {
           "id": "codeHealthContainer",
-          "title": "Code Health Pro",
-          "icon": "$(heart-filled)"
+          "title": "Code Health",
+          "icon": "$(pulse)"
         }
       ]
     },
@@ -26,103 +26,54 @@
       "codeHealthContainer": [
         {
           "id": "codeHealthSidebarView",
-          "name": "Health Dashboard",
+          "name": "Code Analyzer",
           "when": "true"
         }
       ]
     },
     "commands": [
       {
-        "command": "code-health.helloWorld",
-        "title": "Hello World",
-        "icon": "$(star-full)"
+        "command": "code-health.analyzeFile",
+        "title": "Analyze Current File",
+        "icon": "$(search)"
+      },
+      {
+        "command": "code-health.uploadAndAnalyze", 
+        "title": "Upload & Analyze File",
+        "icon": "$(cloud-upload)"
       },
       {
         "command": "code-health.refresh",
-        "title": "Refresh Dashboard",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "code-health.checkHealth",
-        "title": "Run Full Health Check",
-        "icon": "$(pulse)"
-      },
-      {
-        "command": "code-health.generateReport",
-        "title": "Generate Report",
-        "icon": "$(graph)"
-      },
-      {
-        "command": "code-health.settings",
-        "title": "Health Settings",
-        "icon": "$(settings-gear)"
-      },
-      {
-        "command": "code-health.export",
-        "title": "Export Data",
-        "icon": "$(export)"
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "code-health.refresh",
+          "command": "code-health.analyzeFile",
           "when": "view == codeHealthSidebarView",
           "group": "navigation@1"
         },
         {
-          "command": "code-health.checkHealth",
-          "when": "view == codeHealthSidebarView",
+          "command": "code-health.uploadAndAnalyze",
+          "when": "view == codeHealthSidebarView", 
           "group": "navigation@2"
         },
         {
-          "command": "code-health.generateReport",
+          "command": "code-health.refresh",
           "when": "view == codeHealthSidebarView",
           "group": "navigation@3"
-        },
-        {
-          "command": "code-health.settings",
-          "when": "view == codeHealthSidebarView",
-          "group": "1_settings"
         }
       ],
-      "view/item/context": [
+      "editor/context": [
         {
-          "command": "code-health.export",
-          "when": "view == codeHealthSidebarView",
-          "group": "inline"
+          "command": "code-health.analyzeFile",
+          "group": "codeHealth",
+          "when": "editorTextFocus"
         }
       ]
-    },
-    "colors": [
-      {
-        "id": "codeHealth.errorColor",
-        "description": "Color for health errors",
-        "defaults": {
-          "dark": "#ff6b6b",
-          "light": "#e74c3c",
-          "highContrast": "#ff0000"
-        }
-      },
-      {
-        "id": "codeHealth.warningColor", 
-        "description": "Color for health warnings",
-        "defaults": {
-          "dark": "#feca57",
-          "light": "#f39c12",
-          "highContrast": "#ffff00"
-        }
-      },
-      {
-        "id": "codeHealth.successColor",
-        "description": "Color for healthy status",
-        "defaults": {
-          "dark": "#48dbfb",
-          "light": "#2ecc71",
-          "highContrast": "#00ff00"
-        }
-      }
-    ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
