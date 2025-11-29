@@ -1,36 +1,20 @@
 {
-  "name": "code-health",
+  "name": "code-health-analyzer",
   "displayName": "Code Health Analyzer",
-  "description": "AI-powered code quality analyzer",
-  "version": "0.0.1",
-  "publisher": "your-name",
+  "description": "Analyze Python code health, detect issues, and get AI-powered fixes with Gemini integration.",
+  "version": "1.0.0",
+  "publisher": "code-health",
   "engines": {
     "vscode": "^1.104.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
-  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "extension.js",
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "codeHealthContainer",
-          "title": "Code Health",
-          "icon": "$(pulse)"
-        }
-      ]
-    },
-    "views": {
-      "codeHealthContainer": [
-        {
-          "id": "codeHealthSidebarView",
-          "name": "Code Analyzer",
-          "when": "true"
-        }
-      ]
-    },
     "commands": [
       {
         "command": "code-health.analyzeFile",
@@ -38,7 +22,7 @@
         "icon": "$(search)"
       },
       {
-        "command": "code-health.uploadAndAnalyze", 
+        "command": "code-health.uploadAndAnalyze",
         "title": "Upload & Analyze File",
         "icon": "$(cloud-upload)"
       },
@@ -46,8 +30,63 @@
         "command": "code-health.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "code-health.fixCode",
+        "title": "Fix Code Issues",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "code-health.showStatus",
+        "title": "Show Backend Status",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "code-health.clearCache",
+        "title": "Clear Backend Cache",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "code-health.cacheStats",
+        "title": "View Cache Statistics",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "code-health.fixIssue",
+        "title": "Fix Specific Issue"
+      },
+      {
+        "command": "code-health.jumpToIssue",
+        "title": "Jump to Issue"
+      },
+      {
+        "command": "code-health.toggleAutoAnalyze",
+        "title": "Toggle Auto-Analyze on Save",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "code-health.analyzeWithOptions",
+        "title": "Analyze with Options",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "code-health.showHistory",
+        "title": "Show Analysis History"
+      },
+      {
+        "command": "code-health.exportResults",
+        "title": "Export Analysis Results",
+        "icon": "$(export)"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "codeHealthSidebarView",
+          "name": "Code Health Analyzer"
+        }
+      ]
+    },
     "menus": {
       "view/title": [
         {
@@ -57,13 +96,18 @@
         },
         {
           "command": "code-health.uploadAndAnalyze",
-          "when": "view == codeHealthSidebarView", 
+          "when": "view == codeHealthSidebarView",
           "group": "navigation@2"
         },
         {
           "command": "code-health.refresh",
           "when": "view == codeHealthSidebarView",
           "group": "navigation@3"
+        },
+        {
+          "command": "code-health.fixCode",
+          "when": "view == codeHealthSidebarView",
+          "group": "navigation@4"
         }
       ],
       "editor/context": [
@@ -72,20 +116,64 @@
           "group": "codeHealth",
           "when": "editorTextFocus"
         }
+      ],
+      "commandPalette": [
+        {
+          "command": "code-health.analyzeFile",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "code-health.fixCode",
+          "when": "editorTextFocus"
+        }
       ]
+    },
+    "configuration": {
+      "title": "Code Health Analyzer",
+      "properties": {
+        "codeHealth.backendUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the AI Code Reviewer backend API"
+        },
+        "codeHealth.autoAnalyzeOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze code when file is saved"
+        },
+        "codeHealth.enableHybridDeduplication": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hybrid multi-stage deduplication for issue detection"
+        },
+        "codeHealth.showDeduplicationStats": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show detailed deduplication statistics in analysis results"
+        },
+        "codeHealth.showInlineDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show issues as inline diagnostics in the editor"
+        },
+        "codeHealth.maxIssuesInline": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of issues to show as inline diagnostics"
+        }
+      }
     }
   },
   "scripts": {
     "lint": "eslint .",
-    "pretest": "npm run lint",
-    "test": "vscode-test"
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "eslint": "^9.34.0",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "eslint": "^8.57.0",
+    "vsce": "^2.15.0"
   }
 }
