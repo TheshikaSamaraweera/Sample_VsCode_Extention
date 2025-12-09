@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
+const os = require('os');
 
 // Global variables to store current analysis data
 let currentAnalysisData = null;
@@ -38,13 +39,13 @@ function activate(context) {
 
     // Create tree data provider
     treeDataProvider = new CodeHealthTreeDataProvider();
-    
+
     // Register tree view
     const treeView = vscode.window.createTreeView('codeHealthSidebarView', {
         treeDataProvider: treeDataProvider,
         showCollapseAll: true
     });
-    
+
     context.subscriptions.push(treeView);
 
     // Check backend health on startup
@@ -89,7 +90,7 @@ function activate(context) {
                 const code = fs.readFileSync(filePath, 'utf8');
                 const extension = path.extname(filePath).slice(1);
                 const filename = path.basename(filePath);
-                
+
                 // Map file extensions to languages
                 const languageMap = {
                     'py': 'python',
@@ -104,7 +105,7 @@ function activate(context) {
                 };
 
                 const language = languageMap[extension] || 'unknown';
-                
+
                 // Store current data for later use
                 currentCode = code;
                 currentLanguage = language;
@@ -112,7 +113,7 @@ function activate(context) {
                 currentFilePath = filePath;
 
                 await analyzeCode(code, language, filename, filePath);
-                
+
             } catch (error) {
                 vscode.window.showErrorMessage(`Error reading file: ${error.message}`);
             }
@@ -268,11 +269,11 @@ async function analyzeCode(code, language, filename, filePath = null) {
         try {
             // Check if backend is running
             progress.report({ increment: 20, message: 'Connecting to AI backend...' });
-            
+
             const config = vscode.workspace.getConfiguration('codeHealth');
             const enableDeduplication = config.get('enableHybridDeduplication', true);
             const showDeduplicationStats = config.get('showDeduplicationStats', true);
-            
+
             const response = await fetch(`${getApiUrl()}/analyze`, {
                 method: 'POST',
                 headers: {
@@ -319,7 +320,7 @@ async function analyzeCode(code, language, filename, filePath = null) {
         } catch (error) {
             backendHealthy = false;
             updateStatusBar();
-            
+
             if (error.code === 'ECONNREFUSED' || error.message.includes('fetch')) {
                 vscode.window.showErrorMessage(
                     '❌ AI Code Reviewer backend is not running! Please start the Python backend first.',
@@ -349,10 +350,10 @@ async function startSmartFix(code, language, filePath) {
             const response = await fetch(`${getApiUrl()}/fix/iterative`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code: code, 
-                    language: language, 
-                    file_path: filePath 
+                body: JSON.stringify({
+                    code: code,
+                    language: language,
+                    file_path: filePath
                 })
             });
 
@@ -387,10 +388,10 @@ async function startSelectiveFix(code, language, filePath) {
             const response = await fetch(`${getApiUrl()}/fix/selective/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code: code, 
-                    language: language, 
-                    file_path: filePath 
+                body: JSON.stringify({
+                    code: code,
+                    language: language,
+                    file_path: filePath
                 })
             });
 
@@ -439,9 +440,12 @@ function showSmartFixResults(result, filename) {
                         editBuilder.replace(fullRange, message.code);
                     });
                     vscode.window.showInformationMessage('✅ Smart AI Fix applied to editor!');
+                    panel.dispose();
                 } else {
                     vscode.window.showErrorMessage('No active editor to apply code to');
                 }
+            } else if (message.command === 'showDiff') {
+                await showDiffView(currentCode, message.code, filename);
             }
         },
         undefined,
@@ -521,6 +525,20 @@ function getSmartFixResultsHtml(result, filename) {
                     margin-right: 10px;
                     margin-bottom: 10px;
                 }
+                .diff-button {
+                    background: #FF9800;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    margin-right: 10px;
+                    margin-bottom: 10px;
+                }
+                .diff-button:hover {
+                    background: #F57C00;
+                }
                 .apply-button {
                     background: #4CAF50;
                 }
@@ -563,6 +581,7 @@ function getSmartFixResultsHtml(result, filename) {
             <div class="code-container">
                 <h3>✨ Refined Code (Iterative AI Fix)</h3>
                 <button class="copy-button" onclick="copyCode()">📋 Copy Code</button>
+                <button class="diff-button" onclick="showDiff()">⚖️ Review Changes (Diff)</button>
                 <button class="apply-button" onclick="applyCode()">✅ Apply to Editor</button>
                 <div class="code-block" id="fixedCode">${escapeHtml(result.refactored_code)}</div>
             </div>
@@ -597,6 +616,15 @@ function getSmartFixResultsHtml(result, filename) {
                         code: text
                     });
                 }
+
+                function showDiff() {
+                    const codeElement = document.getElementById('fixedCode');
+                    const text = codeElement.textContent;
+                    vscode.postMessage({
+                        command: 'showDiff',
+                        code: text
+                    });
+                }
             </script>
         </body>
         </html>
@@ -617,7 +645,7 @@ function escapeHtml(text) {
 // Helper function to update status bar
 function updateStatusBar() {
     if (!statusBarItem) return;
-    
+
     if (backendHealthy) {
         statusBarItem.text = `$(check) Code Health ${autoAnalyzeEnabled ? '$(sync)' : ''}`;
         statusBarItem.tooltip = `Backend: Online${autoAnalyzeEnabled ? ' | Auto-analyze: ON' : ''}`;
@@ -636,7 +664,7 @@ async function checkBackendHealth() {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
-        
+
         if (response.ok) {
             backendHealthy = true;
             const health = await response.json();
@@ -658,7 +686,7 @@ async function showBackendStatus() {
         if (!response.ok) {
             throw new Error('Backend not responding');
         }
-        
+
         const health = await response.json();
         const panel = vscode.window.createWebviewPanel(
             'backendStatus',
@@ -666,7 +694,7 @@ async function showBackendStatus() {
             vscode.ViewColumn.One,
             {}
         );
-        
+
         panel.webview.html = getBackendStatusHtml(health);
     } catch (error) {
         vscode.window.showErrorMessage(
@@ -686,7 +714,7 @@ async function clearBackendCache() {
         const response = await fetch(`${getApiUrl()}/cache/clear`, {
             method: 'DELETE'
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             vscode.window.showInformationMessage(`✅ ${result.message}`);
@@ -705,7 +733,7 @@ async function showCacheStats() {
         if (!response.ok) {
             throw new Error('Failed to get cache stats');
         }
-        
+
         const stats = await response.json();
         vscode.window.showInformationMessage(
             `📊 Cache Stats: ${stats.total_entries} entries, ${stats.cache_size_mb.toFixed(2)} MB`
@@ -743,11 +771,11 @@ async function fixSpecificIssue(issueId) {
             const response = await fetch(`${getApiUrl()}/fix/selective/apply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code: currentCode, 
-                    issue_ids: [issue_index], 
-                    language: currentLanguage, 
-                    file_path: currentFilePath 
+                body: JSON.stringify({
+                    code: currentCode,
+                    issue_ids: [issue_index],
+                    language: currentLanguage,
+                    file_path: currentFilePath
                 })
             });
 
@@ -775,7 +803,7 @@ function jumpToLine(line) {
         vscode.window.showErrorMessage('No active editor');
         return;
     }
-    
+
     const position = new vscode.Position(Math.max(0, line - 1), 0);
     editor.selection = new vscode.Selection(position, position);
     editor.revealRange(
@@ -791,7 +819,7 @@ async function analyzeWithOptions() {
         vscode.window.showErrorMessage('No file is currently open');
         return;
     }
-    
+
     const options = await vscode.window.showQuickPick(
         [
             { label: 'Standard Analysis', value: 'standard' },
@@ -800,20 +828,20 @@ async function analyzeWithOptions() {
         ],
         { placeHolder: 'Select analysis type' }
     );
-    
+
     if (!options) return;
-    
+
     const config = vscode.workspace.getConfiguration('codeHealth');
     const originalDedup = config.get('enableHybridDeduplication');
     const originalStats = config.get('showDeduplicationStats');
-    
+
     if (options.value === 'dedup') {
         await config.update('enableHybridDeduplication', true, false);
         await config.update('showDeduplicationStats', true, false);
     } else if (options.value === 'nodedup') {
         await config.update('enableHybridDeduplication', false, false);
     }
-    
+
     const document = editor.document;
     await analyzeCode(
         document.getText(),
@@ -821,7 +849,7 @@ async function analyzeWithOptions() {
         path.basename(document.fileName),
         document.fileName
     );
-    
+
     // Restore original settings
     await config.update('enableHybridDeduplication', originalDedup, false);
     await config.update('showDeduplicationStats', originalStats, false);
@@ -838,7 +866,7 @@ async function exportAnalysisResults() {
         vscode.window.showErrorMessage('No analysis data to export');
         return;
     }
-    
+
     const uri = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file('analysis-results.json'),
         filters: {
@@ -847,12 +875,12 @@ async function exportAnalysisResults() {
             'Markdown': ['md']
         }
     });
-    
+
     if (uri) {
         try {
             const ext = path.extname(uri.fsPath);
             let content;
-            
+
             if (ext === '.json') {
                 content = JSON.stringify(currentAnalysisData, null, 2);
             } else if (ext === '.md') {
@@ -860,7 +888,7 @@ async function exportAnalysisResults() {
             } else {
                 content = generateTextReport(currentAnalysisData);
             }
-            
+
             fs.writeFileSync(uri.fsPath, content, 'utf8');
             vscode.window.showInformationMessage(`✅ Results exported to ${uri.fsPath}`);
         } catch (error) {
@@ -875,12 +903,12 @@ function generateMarkdownReport(data) {
     md += `**Score:** ${data.code_score.toFixed(1)}/100\n`;
     md += `**Total Issues:** ${data.total_issues}\n`;
     md += `**Timestamp:** ${new Date(data.analysis_timestamp).toLocaleString()}\n\n`;
-    
+
     md += `## Severity Breakdown\n\n`;
     for (const [severity, count] of Object.entries(data.severity_counts || {})) {
         md += `- **${severity}:** ${count}\n`;
     }
-    
+
     md += `\n## Issues\n\n`;
     data.issues.forEach((issue, i) => {
         md += `### ${i + 1}. Line ${issue.line} - ${issue.severity}\n`;
@@ -889,7 +917,7 @@ function generateMarkdownReport(data) {
         md += `**Category:** ${issue.category} | **Source:** ${issue.source}\n\n`;
         md += `---\n\n`;
     });
-    
+
     return md;
 }
 
@@ -899,31 +927,31 @@ function generateTextReport(data) {
     txt += `Score: ${data.code_score.toFixed(1)}/100\n`;
     txt += `Total Issues: ${data.total_issues}\n`;
     txt += `Timestamp: ${new Date(data.analysis_timestamp).toLocaleString()}\n\n`;
-    
+
     txt += `ISSUES:\n${'-'.repeat(50)}\n\n`;
     data.issues.forEach((issue, i) => {
         txt += `${i + 1}. Line ${issue.line} [${issue.severity.toUpperCase()}]\n`;
         txt += `   ${issue.description}\n`;
         txt += `   Suggestion: ${issue.suggestion}\n\n`;
     });
-    
+
     return txt;
 }
 
 // Update diagnostics
 function updateDiagnostics(analysisData, filePath) {
     if (!filePath || !diagnosticCollection) return;
-    
+
     const diagnostics = [];
     const uri = vscode.Uri.file(filePath);
-    
+
     for (const issue of analysisData.issues || []) {
         const line = Math.max(0, (issue.line || 1) - 1);
         const range = new vscode.Range(
             new vscode.Position(line, 0),
             new vscode.Position(line, 1000)
         );
-        
+
         let severity;
         switch (issue.severity?.toLowerCase()) {
             case 'critical':
@@ -939,18 +967,18 @@ function updateDiagnostics(analysisData, filePath) {
             default:
                 severity = vscode.DiagnosticSeverity.Hint;
         }
-        
+
         const diagnostic = new vscode.Diagnostic(
             range,
             `${issue.description}\n💡 ${issue.suggestion}`,
             severity
         );
-        
+
         diagnostic.source = 'Code Health';
         diagnostic.code = issue.id;
         diagnostics.push(diagnostic);
     }
-    
+
     diagnosticCollection.set(uri, diagnostics);
 }
 
@@ -959,10 +987,10 @@ class CodeHealthActionProvider {
     static providedCodeActionKinds = [
         vscode.CodeActionKind.QuickFix
     ];
-    
+
     provideCodeActions(document, range, context) {
         const actions = [];
-        
+
         for (const diagnostic of context.diagnostics) {
             if (diagnostic.source === 'Code Health') {
                 const action = new vscode.CodeAction(
@@ -976,7 +1004,7 @@ class CodeHealthActionProvider {
                 };
                 action.diagnostics = [diagnostic];
                 actions.push(action);
-                
+
                 // Add "Jump to issue" action
                 const jumpAction = new vscode.CodeAction(
                     'View issue details',
@@ -990,7 +1018,7 @@ class CodeHealthActionProvider {
                 actions.push(jumpAction);
             }
         }
-        
+
         return actions;
     }
 }
@@ -1049,9 +1077,12 @@ function showFixedCode(result, filename) {
                         editBuilder.replace(fullRange, message.code);
                     });
                     vscode.window.showInformationMessage('✅ Fixed code applied to editor!');
+                    panel.dispose();
                 } else {
                     vscode.window.showErrorMessage('No active editor to apply code to');
                 }
+            } else if (message.command === 'showDiff') {
+                await showDiffView(currentCode, message.code, filename);
             }
         },
         undefined,
@@ -1558,9 +1589,12 @@ function showIterativeFixResults(result, filename) {
                         editBuilder.replace(fullRange, message.code);
                     });
                     vscode.window.showInformationMessage('✅ Smart-Fix applied to editor!');
+                    panel.dispose();
                 } else {
                     vscode.window.showErrorMessage('No active editor to apply code to');
                 }
+            } else if (message.command === 'showDiff') {
+                await showDiffView(currentCode, message.code, filename);
             }
         },
         undefined,
@@ -1603,11 +1637,11 @@ async function applySelectedFixes(code, language, filePath, issueIds, panel) {
             const response = await fetch(`${getApiUrl()}/fix/selective/apply`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code: code, 
-                    issue_ids: issueIds, 
-                    language: language, 
-                    file_path: filePath 
+                body: JSON.stringify({
+                    code: code,
+                    issue_ids: issueIds,
+                    language: language,
+                    file_path: filePath
                 })
             });
 
@@ -1627,6 +1661,26 @@ async function applySelectedFixes(code, language, filePath, issueIds, panel) {
             console.error('Apply fixes error:', error);
         }
     });
+}
+
+async function showDiffView(originalCode, fixedCode, filename) {
+    try {
+        // Create a temporary file for the fixed code
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, `fixed_${filename}`);
+        fs.writeFileSync(tempFilePath, fixedCode);
+
+        const originalUri = vscode.Uri.file(currentFilePath); // Use the global currentFilePath
+        const fixedUri = vscode.Uri.file(tempFilePath);
+
+        await vscode.commands.executeCommand('vscode.diff',
+            originalUri,
+            fixedUri,
+            `Original vs Fixed: ${filename}`
+        );
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to show diff view: ${error.message}`);
+    }
 }
 
 function getFixedCodeHtml(result, filename) {
@@ -1705,6 +1759,20 @@ function getFixedCodeHtml(result, filename) {
                 .apply-button:hover {
                     background: #45a049;
                 }
+                .diff-button {
+                    background: #FF9800;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                    margin-right: 10px;
+                }
+                .diff-button:hover {
+                    background: #F57C00;
+                }
             </style>
         </head>
         <body>
@@ -1728,6 +1796,7 @@ function getFixedCodeHtml(result, filename) {
 
             <div class="code-container">
                 <button class="copy-button" onclick="copyCode()">📋 Copy Fixed Code</button>
+                <button class="diff-button" onclick="showDiff()">⚖️ Review Changes (Diff)</button>
                 <button class="apply-button" onclick="applyCode()">✅ Apply to Editor</button>
                 <div class="code-block" id="fixedCode">${escapeHtml(result.refactored_code)}</div>
             </div>
@@ -1881,12 +1950,19 @@ function getIterativeFixResultsHtml(result, filename) {
             <div>${historyHtml}</div>
             <h2>Final Code</h2>
             <pre><code>${escapeHtml(result.final_code)}</code></pre>
+            <button onclick="showDiff()">Review Changes (Diff)</button>
             <button onclick="applyCode()">Apply to Editor</button>
             <script>
                 const vscode = acquireVsCodeApi();
                 function applyCode() {
                     vscode.postMessage({
                         command: 'applyCode',
+                        code: ${JSON.stringify(result.final_code)}
+                    });
+                }
+                function showDiff() {
+                    vscode.postMessage({
+                        command: 'showDiff',
                         code: ${JSON.stringify(result.final_code)}
                     });
                 }
@@ -2061,10 +2137,10 @@ class CodeHealthTreeDataProvider {
             return items;
         } else if (element.label.includes('Results:')) {
             if (!this.analysisData) return [];
-            
+
             const items = [];
             const severityCounts = this.analysisData.severity_counts || {};
-            
+
             if (severityCounts.critical > 0) {
                 items.push(new CodeHealthItem(`🔴 Critical: ${severityCounts.critical}`, '', vscode.TreeItemCollapsibleState.None));
             }
